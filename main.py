@@ -9,8 +9,12 @@ from tkinter.ttk import Label, Entry, Button, Style, Progressbar
 import requests
 import io
 import sys
+import os
 
 hi_res_preview = False
+base_dir = "."
+if getattr(sys, 'frozen', False):
+    base_dir = sys._MEIPASS
 
 
 class PixivSort:
@@ -32,7 +36,7 @@ class PixivSort:
 
         self.root = Tk()
         self.root.title('PixivSort by Zettroke')
-        self.root.iconbitmap(self.pth[:-1] + "\\" + 'icon.ico')
+        self.root.iconbitmap(os.path.join(base_dir, 'icon.ico'))
         self.progress_bar_var = IntVar()
         self.progress_bar_label_var = StringVar()
         self.frame = Frame(self.root, height=100, width=1000, bg='#0094DC')
@@ -56,7 +60,7 @@ class PixivSort:
 
         cnv = Canvas(self.root, width=300, height=100, bg='#0094DC', bd=0, highlightthickness=0, relief='ridge')
         cnv.place(x=0, y=0)
-        MyLabel = ImageTk.PhotoImage(Image.open(self.pth + 'Label.png').resize((250, 100), Image.BICUBIC))
+        MyLabel = ImageTk.PhotoImage(Image.open(os.path.join(base_dir, 'Label.png')).resize((round(564/(264/100)), 100), Image.BICUBIC))
         cnv.create_image(125, 52.5, image=MyLabel)
 
         label = Label(self.root, text='Search', anchor=CENTER, font='Arial 16')
@@ -76,7 +80,7 @@ class PixivSort:
         button_page_inc.bind('<Button-1>', self.page_button)
         button_page_dec.bind('<Button-1>', self.page_button)
 
-        self.loading_img = ImageTk.PhotoImage(Image.open(self.pth + 'loading.png').resize((170, 170), Image.BICUBIC))
+        self.loading_img = ImageTk.PhotoImage(Image.open(os.path.join(base_dir, 'loading.png')).resize((170, 170), Image.BICUBIC))
 
         self.entry = Entry(self.root, width=18, font='Arial 14')
         self.entry.place(x=430, y=50)
@@ -158,6 +162,7 @@ class PixivSort:
         self.image_pages_labels.clear()
         self.image_raiting_labels.clear()
         self.images_obj.clear()
+        self.image_files.clear()
         self.canvas.delete(ALL)
         try:
             # self.image_list = send_request.show(self.current_page*15-15, self.current_page*15)
@@ -177,7 +182,6 @@ class PixivSort:
                 self.image_pages_labels.append(label2)
                 x += 190
             for i in range(len(self.image_list)):
-                # self.image_load_queue.put(i)
                 Thread(target=self.load_image, args=(i,), daemon=True).start()
         except Exception:
             pass

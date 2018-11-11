@@ -4,7 +4,7 @@ from multiprocessing import Pool, Lock
 import sys
 import os
 
-per_page = 200
+per_page = 100
 
 
 def search(query, callback, progress_update):
@@ -17,19 +17,26 @@ def search(query, callback, progress_update):
         if getattr(sys, 'frozen', False):
             conf_file_path = os.path.join(sys._MEIPASS, conf_file_path)
         conf = eval(open(conf_file_path, "r").read())
+        assert conf['username']
+        assert conf['password']
+        assert conf['process_num']
     except Exception:
         conf = {
             'username': 'rdm62865@ebbob.com',
-            'password': 'pixivsort_1234'
+            'password': 'pixivsort_1234',
+            'process_num': '16'
         }
         open("config", "w").write(str(conf))
+
+    process_num = int(conf['process_num'])
 
     data = {
         'client_id': 'bYGKuGVw91e0NMfPGp44euvGt59s',  # 'bYGKuGVw91e0NMfPGp44euvGt59s',
         'client_secret': 'HP3RmkgAmEGro0gn1x9ioawQE8WMfvLXDz3ZqxpK',
-        'grant_type': 'password'
+        'grant_type': 'password',
+        'username': conf['username'],
+        'password': conf['password']
     }
-    data.update(conf)
 
     headers = {
         'Referer': 'http://www.pixiv.net/',
@@ -84,7 +91,7 @@ def search(query, callback, progress_update):
     if to_run2 * per_page > 20000:
         to_run2 = round(20000 / per_page + 0.5)
 
-    pool = Pool(16)
+    pool = Pool(min(process_num, to_run+to_run2))
     done_cnt = 0
 
     def res_append(res):
