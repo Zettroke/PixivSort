@@ -73,11 +73,13 @@ def search(query, callback, progress_update):
         pg = json.loads(requests.get('https://public-api.secure.pixiv.net/v1/search/works.json', params=params, headers=headers).text)
     params["per_page"] = per_page
     total = pg["pagination"]["total"]
-    to_run = round(total/per_page + 0.5)
 
+    # newest posts
+    to_run = round(total/per_page + 0.5)
     if to_run * per_page > 20000:
         to_run = round(20000/per_page+0.5)
 
+    # oldest posts
     to_run2 = max(round((total - to_run*per_page)/per_page + 0.5), 0)
     if to_run2 * per_page > 20000:
         to_run2 = round(20000 / per_page + 0.5)
