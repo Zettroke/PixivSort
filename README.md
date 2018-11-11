@@ -8,7 +8,7 @@ There is bundled version for Windows. You can download it [here](https://github.
 
 To run it you need `python 3+`.
 
-And following modules: `tkinter`, `tkinter`.
+And following modules: `tkinter`, `requests`.
 
 ### Screenshots:
 ![screenshot](doc/screenshot.jpg)
