@@ -1,18 +1,20 @@
-import send_request
-import os
+import send_request_multiproc
 import math
 from threading import Thread
-import urllib.request
+from multiprocessing import freeze_support
 from PIL import Image, ImageTk
 from tkinter import Tk, Canvas, CENTER, SW, W, END, ACTIVE, DISABLED, Frame, ALL, IntVar, StringVar, Label as LabelOld
 import webbrowser
 from tkinter.ttk import Label, Entry, Button, Style, Progressbar
+import requests
+import io
+import sys
 
-''' (post_link, post_image, pages, raitng) '''
+hi_res_preview = False
 
-'#0094DC'
 
 class PixivSort:
+    curr_search_result = []
     image_files = []
     images_obj = []
     image_list = []
@@ -22,9 +24,15 @@ class PixivSort:
     image_pages_labels = []
 
     def __init__(self):
+        self.pth = "./"
+        try:
+            self.pth = sys._MEIPASS + "/"
+        except Exception:
+            pass
+
         self.root = Tk()
-        self.root.title('PixivSort by Olleggerr')
-        # self.root.iconbitmap(os.getcwd() + '/' + 'icon.ico')
+        self.root.title('PixivSort by Zettroke')
+        self.root.iconbitmap(self.pth[:-1] + "\\" + 'icon.ico')
         self.progress_bar_var = IntVar()
         self.progress_bar_label_var = StringVar()
         self.frame = Frame(self.root, height=100, width=1000, bg='#0094DC')
@@ -37,14 +45,6 @@ class PixivSort:
         self.root.maxsize(1000, 810)
         self.canvas = Canvas(self.root, width=1000, height=2000, bg='white')
 
-        # self.yscrollbar = Scrollbar(self.root, orient="vertical")
-        # self.yscrollbar.pack(side=RIGHT, fill=Y)
-
-        # self.yscrollbar.config(command=self.canvas.yview)
-        # self.canvas.config(yscrollcommand=self.yscrollbar.set)
-
-        # image = ImageTk.PhotoImage(Image.open('os.curdir + '/' + loading.png').resize((150, 150)))
-        # img = canvas.create_image(170, 170, image=image, anchor=SE, tags='asd')
         self.canvas.place(x=0, y=100)
         self.canvas.bind('<Button-1>', self.press)
 
@@ -56,7 +56,7 @@ class PixivSort:
 
         cnv = Canvas(self.root, width=300, height=100, bg='#0094DC', bd=0, highlightthickness=0, relief='ridge')
         cnv.place(x=0, y=0)
-        MyLabel = ImageTk.PhotoImage(Image.open(os.curdir + '/' + 'Label.png').resize((250, 100), Image.BICUBIC))
+        MyLabel = ImageTk.PhotoImage(Image.open(self.pth + 'Label.png').resize((250, 100), Image.BICUBIC))
         cnv.create_image(125, 52.5, image=MyLabel)
 
         label = Label(self.root, text='Search', anchor=CENTER, font='Arial 16')
@@ -76,7 +76,7 @@ class PixivSort:
         button_page_inc.bind('<Button-1>', self.page_button)
         button_page_dec.bind('<Button-1>', self.page_button)
 
-        self.loading_img = ImageTk.PhotoImage(Image.open(os.curdir + '/' + 'loading.png').resize((170, 170), Image.BICUBIC))
+        self.loading_img = ImageTk.PhotoImage(Image.open(self.pth + 'loading.png').resize((170, 170), Image.BICUBIC))
 
         self.entry = Entry(self.root, width=18, font='Arial 14')
         self.entry.place(x=430, y=50)
@@ -84,13 +84,18 @@ class PixivSort:
         self.entry_page = Entry(self.root, width=5, font='Arial 14')
         self.entry_page.place(x=860, y=70)
         self.entry_page.bind('<Return>', self.show_new)
+
         self.root.mainloop()
 
     def press(self, event):
         tap = event.widget.find_overlapping(event.x, event.y, event.x+1, event.y+1)
         if len(tap) != 0:
             tap = int(event.widget.gettags(tap[0])[0])
-            webbrowser.open(self.image_list[tap-1][0])
+            img = self.image_list[tap-1]
+            if img[3] == 1:
+                webbrowser.open("https://www.pixiv.net/member_illust.php?mode=medium&illust_id=" + str(img[0]))
+            else:
+                webbrowser.open("https://www.pixiv.net/member_illust.php?mode=manga&illust_id=" + str(img[0]))
 
     def set_total_pages(self, total):
 
@@ -102,13 +107,28 @@ class PixivSort:
     def search(self, event):
         event.widget.config(state=DISABLED)
         self.progress_bar_label_var.set('downloading...')
-        Thread(daemon=True, target=send_request.search_request, args=(self.entry.get(), self.show, self.set_total_pages, self.progress_bar_var, self.progress_bar_label_var)).start()
+
+        Thread(target=send_request_multiproc.search, args=(self.entry.get(), self.done, self.progress_update), daemon=True).start()
+
+    def done(self, res):
+        self.curr_search_result = res
+        self.set_total_pages(len(res))
+        self.show()
+        self.entry.config(state=ACTIVE)
+
+    def progress_update(self, done, total):
+        print("done", round(done/total*100, 2))
+        self.root.after_idle(self.change_pbar_value, (done/total))
+
+    def change_pbar_value(self, val):
+        self.progress_bar_var.set(val*1000)
 
     def load_image(self, num):
-        self.image_files.clear()
-        r = urllib.request.urlopen(self.image_list[num][1])
-        open(os.curdir + '/' + 'temp/dump_img{0}.jpg'.format(num), 'wb').write(r.read())
-        image = ImageTk.PhotoImage(Image.open(open(os.curdir + '/' + 'temp/dump_img{0}.jpg'.format(num), 'rb')).resize((170, 170), Image.BICUBIC))
+        if hi_res_preview:
+            f = io.BytesIO(requests.get(self.image_list[num][1], headers={"Referer": "https://www.pixiv.net/"}).content)
+        else:
+            f = io.BytesIO(requests.get(self.image_list[num][2], headers={"Referer": "https://www.pixiv.net/"}).content)
+        image = ImageTk.PhotoImage(Image.open(f).resize((170, 170), Image.BICUBIC))
         self.image_files.append(image)
         self.canvas.itemconfig(self.images_obj[num], image=image)
 
@@ -139,7 +159,8 @@ class PixivSort:
         self.images_obj.clear()
         self.canvas.delete(ALL)
         try:
-            self.image_list = send_request.show(self.current_page*15-15, self.current_page*15)
+            # self.image_list = send_request.show(self.current_page*15-15, self.current_page*15)
+            self.image_list = self.curr_search_result[self.current_page*15-15:self.current_page*15]
             y = 0
             x = 35
             for i in range(len(self.image_list)):
@@ -147,15 +168,20 @@ class PixivSort:
                     y += 220
                     x = 35
                 self.images_obj.append(self.canvas.create_image(x, y, image=self.loading_img, anchor=SW, tags=str(i+1)))
-                label1 = LabelOld(self.root, text='Raiting: ' + str(self.image_list[i][3]), bg='white')
+                label1 = LabelOld(self.root, text='Raiting: ' + str(self.image_list[i][4]), bg='white')
                 label1.place(x=x, y=y+100)
                 self.image_raiting_labels.append(label1)
-                label2 = LabelOld(self.root, text='Pages: ' + str(self.image_list[i][2]), bg='white')
+                label2 = LabelOld(self.root, text='Pages: ' + str(self.image_list[i][3]), bg='white')
                 label2.place(x=x+120, y=y+100)
                 self.image_pages_labels.append(label2)
                 x += 190
             for i in range(len(self.image_list)):
+                # self.image_load_queue.put(i)
                 Thread(target=self.load_image, args=(i,), daemon=True).start()
         except Exception:
             pass
-PixivSort()
+
+
+if __name__ == '__main__':
+    freeze_support()
+    PixivSort()
