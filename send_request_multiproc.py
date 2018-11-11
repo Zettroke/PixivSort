@@ -105,6 +105,7 @@ def search(query, callback, progress_update):
     pool.join()
     callback(sorted(list(result.values()), key=lambda x: x[4], reverse=True))
 
+
 # post - (id, preview_480, preview_128, page_count, favorite_count)
 def req(query, page, params, headers):
     params["page"] = page
