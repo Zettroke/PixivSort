@@ -107,12 +107,13 @@ class PixivSort:
     def search(self, event):
         event.widget.config(state=DISABLED)
         self.progress_bar_label_var.set('downloading...')
-
+        self.progress_bar_var.set(0)
         Thread(target=send_request_multiproc.search, args=(self.entry.get(), self.done, self.progress_update), daemon=True).start()
 
     def done(self, res):
         self.curr_search_result = res
         self.set_total_pages(len(res))
+        self.progress_bar_label_var.set('done!!!')
         self.show()
         self.entry.config(state=ACTIVE)
 

@@ -19,7 +19,7 @@ def search(query, callback, progress_update):
         conf = eval(open(conf_file_path, "r").read())
     except Exception:
         conf = {
-            'username': 'P1xivSorter',
+            'username': 'rdm62865@ebbob.com',
             'password': 'pixivsort_1234'
         }
         open("config", "w").write(str(conf))
