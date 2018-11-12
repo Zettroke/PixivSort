@@ -3,7 +3,7 @@ import math
 from threading import Thread
 from multiprocessing import freeze_support
 from PIL import Image, ImageTk
-from tkinter import Tk, Canvas, CENTER, SW, W, END, ACTIVE, DISABLED, Frame, ALL, IntVar, StringVar, Label as LabelOld
+from tkinter import Tk, Canvas, CENTER, SW, W, END, NORMAL, DISABLED, Frame, ALL, IntVar, StringVar, Label as LabelOld
 import webbrowser
 from tkinter.ttk import Label, Entry, Button, Style, Progressbar
 import requests
@@ -66,6 +66,7 @@ class PixivSort:
         label = Label(self.root, text='Search', anchor=CENTER, font='Arial 16')
         label.place(x=500, y=20)
 
+        self.total_pages_num = 0
         self.total_pages_label = Label(self.root, text='/0', anchor=W, font='Arial 14')
         self.total_pages_label.place(x=920, y=70)
 
@@ -73,21 +74,24 @@ class PixivSort:
         self.button.place(x=650, y=50)
         self.button.bind('<Button-1>', self.search)
 
-        button_page_inc = Button(self.root, text='>', width=1)
-        button_page_dec = Button(self.root, text='<', width=1)
-        button_page_dec.place(x=845, y=72)
-        button_page_inc.place(x=970, y=72)
-        button_page_inc.bind('<Button-1>', self.page_button)
-        button_page_dec.bind('<Button-1>', self.page_button)
+        self.button_page_inc = Button(self.root, text='>', width=1, state=DISABLED)
+        self.button_page_dec = Button(self.root, text='<', width=1, state=DISABLED)
+
+        self.button_page_inc.place(x=970, y=72)
+        self.button_page_dec.place(x=845, y=72)
+
+        self.button_page_inc.bind('<Button-1>', self.page_button)
+        self.button_page_dec.bind('<Button-1>', self.page_button)
 
         self.loading_img = ImageTk.PhotoImage(Image.open(os.path.join(base_dir, 'loading.png')).resize((170, 170), Image.BICUBIC))
 
         self.entry = Entry(self.root, width=18, font='Arial 14')
         self.entry.place(x=430, y=50)
         self.entry.bind('<Return>', self.search)
-        self.entry_page = Entry(self.root, width=5, font='Arial 14')
-        self.entry_page.place(x=860, y=70)
-        self.entry_page.bind('<Return>', self.show_new)
+
+        self.entry_page_number = Entry(self.root, width=5, font='Arial 14', state=DISABLED)
+        self.entry_page_number.place(x=860, y=70)
+        self.entry_page_number.bind('<Return>', self.show_new)
 
         self.root.mainloop()
 
@@ -102,10 +106,10 @@ class PixivSort:
                 webbrowser.open("https://www.pixiv.net/member_illust.php?mode=manga&illust_id=" + str(img[0]))
 
     def set_total_pages(self, total):
-
-        self.total_pages_label.config(text='/' + str(math.ceil(40000/15 if total/15 > 40000/15 else total/15)))
-        self.entry_page.delete(0, END)
-        self.entry_page.insert(0, '1')
+        self.total_pages_num = math.ceil(40000/15 if total/15 > 40000/15 else total/15)
+        self.total_pages_label.config(text='/' + str(self.total_pages_num))
+        self.entry_page_number.delete(0, END)
+        self.entry_page_number.insert(0, '1')
         self.current_page = 1
 
     def search(self, event):
@@ -116,10 +120,15 @@ class PixivSort:
 
     def done(self, res):
         self.curr_search_result = res
+
+        self.entry_page_number.configure(state=NORMAL)
+        self.button_page_inc.configure(state=NORMAL)
+        self.button_page_dec.configure(state=NORMAL)
+
         self.set_total_pages(len(res))
         self.progress_bar_label_var.set('done!!!')
         self.show()
-        self.entry.config(state=ACTIVE)
+        self.entry.config(state=NORMAL)
 
     def progress_update(self, done, total):
         print("done", round(done/total*100, 2))
@@ -129,32 +138,38 @@ class PixivSort:
         self.progress_bar_var.set(val*1000)
 
     def load_image(self, num):
+        img = self.image_list[num]
         if hi_res_preview:
-            f = io.BytesIO(requests.get(self.image_list[num][1], headers={"Referer": "https://www.pixiv.net/"}).content)
+            f = io.BytesIO(requests.get(img[1], headers={"Referer": "https://www.pixiv.net/"}).content)
         else:
-            f = io.BytesIO(requests.get(self.image_list[num][2], headers={"Referer": "https://www.pixiv.net/"}).content)
+            f = io.BytesIO(requests.get(img[2], headers={"Referer": "https://www.pixiv.net/"}).content)
         image = ImageTk.PhotoImage(Image.open(f).resize((170, 170), Image.BICUBIC))
-        self.image_files.append(image)
-        self.canvas.itemconfig(self.images_obj[num], image=image)
+        if img in self.image_list:
+            self.image_files.append(image)
+            self.canvas.itemconfig(self.images_obj[num], image=image)
 
     def show_new(self, event=None):
-        self.current_page = int(self.entry_page.get())
+        if not 0 < int(self.entry_page_number.get()) < self.total_pages_num:
+            self.entry_page_number.delete(0, END)
+            self.entry_page_number.insert(0, '0')
+        else:
+            self.current_page = int(self.entry_page_number.get())
         self.show()
 
     def page_button(self, event):
-        if event.widget.cget('text') == '>':
-            temp = int(self.entry_page.get())
-            self.entry_page.delete(0, END)
-            self.entry_page.insert(0, str(temp+1))
+        if event.widget.cget('text') == '>' and self.current_page < self.total_pages_num:
+            temp = int(self.entry_page_number.get())
+            self.entry_page_number.delete(0, END)
+            self.entry_page_number.insert(0, str(temp + 1))
             self.show_new()
         elif event.widget.cget('text') == '<' and self.current_page > 1:
-            temp = int(self.entry_page.get())
-            self.entry_page.delete(0, END)
-            self.entry_page.insert(0, str(temp-1))
+            temp = int(self.entry_page_number.get())
+            self.entry_page_number.delete(0, END)
+            self.entry_page_number.insert(0, str(temp - 1))
             self.show_new()
 
     def show(self, event=None):
-        self.button.config(state=ACTIVE)
+        self.button.config(state=NORMAL)
         for i in self.image_pages_labels:
             i.destroy()
         for i in self.image_raiting_labels:
@@ -165,7 +180,6 @@ class PixivSort:
         self.image_files.clear()
         self.canvas.delete(ALL)
         try:
-            # self.image_list = send_request.show(self.current_page*15-15, self.current_page*15)
             self.image_list = self.curr_search_result[self.current_page*15-15:self.current_page*15]
             y = 0
             x = 35
